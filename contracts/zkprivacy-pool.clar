@@ -153,3 +153,71 @@
         }
     )
 )
+
+;; Verifies a complete Merkle proof against the current root
+(define-private (verify-merkle-proof 
+    (leaf-hash (buff 32))
+    (proof (list 20 (buff 32)))
+    (root (buff 32)))
+    (let (
+        (proof-result (fold verify-proof-level
+            proof
+            {current-hash: leaf-hash, is-valid: true}))
+    )
+        (asserts! (is-valid-hash? leaf-hash) ERR-INVALID-PROOF)
+        (asserts! (is-valid-hash? root) ERR-INVALID-ROOT)
+        (asserts! (is-eq root (var-get current-root)) ERR-INVALID-ROOT)
+        (if (get is-valid proof-result)
+            (ok true)
+            ERR-INVALID-PROOF)
+    )
+)
+
+;; Public Functions
+
+;; Deposits tokens into the privacy pool and adds the commitment to the Merkle tree
+(define-public (deposit 
+    (commitment (buff 32))
+    (amount uint)
+    (token <ft-trait>))
+    (let (
+        (leaf-index (var-get next-index))
+    )
+        ;; Input validation
+        (try! (validate-amount amount))
+        (asserts! (not (is-eq commitment ZERO-VALUE)) ERR-INVALID-COMMITMENT)
+        (asserts! (< leaf-index (pow u2 MERKLE-TREE-HEIGHT)) ERR-TREE-FULL)
+        (try! (validate-token token))
+        
+        ;; Perform token transfer
+        (try! (contract-call? token transfer 
+            amount 
+            tx-sender 
+            (as-contract tx-sender) 
+            none))
+        
+        ;; Update Merkle tree
+        (set-tree-node u0 leaf-index commitment)
+        
+        ;; Update Merkle tree levels - now with proper error handling
+        (try! (update-parent-at-level u0 leaf-index))
+        (try! (update-parent-at-level u1 (/ leaf-index u2)))
+        (try! (update-parent-at-level u2 (/ leaf-index u4)))
+        (try! (update-parent-at-level u3 (/ leaf-index u8)))
+        (try! (update-parent-at-level u4 (/ leaf-index u16)))
+        (try! (update-parent-at-level u5 (/ leaf-index u32)))
+        
+        ;; Record deposit
+        (map-set deposits 
+            {commitment: commitment}
+            {
+                leaf-index: leaf-index,
+                timestamp: block-height
+            })
+        
+        (var-set next-index (+ leaf-index u1))
+        (var-set current-root (get-tree-node MERKLE-TREE-HEIGHT u0))
+        
+        (ok leaf-index)
+    )
+)
