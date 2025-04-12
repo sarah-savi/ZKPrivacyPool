@@ -65,3 +65,45 @@
     {level: uint, index: uint} 
     {hash: (buff 32)}
 )
+
+;; Private Functions
+
+;; Combines two 32-byte hashes to create a parent hash in the Merkle tree
+(define-private (hash-combine (left (buff 32)) (right (buff 32)))
+    (sha256 (concat left right))
+)
+
+;; Validates that a hash is properly formatted and not the zero value
+(define-private (is-valid-hash? (hash (buff 32)))
+    (and 
+        (not (is-eq hash ZERO-VALUE))
+        (is-eq (len hash) u32)
+    )
+)
+
+;; Ensures the token being used is authorized for this privacy pool
+(define-private (validate-token (token <ft-trait>))
+    (match (var-get allowed-token)
+        allowed-principal (if (is-eq (contract-of token) allowed-principal)
+                            (ok true)
+                            ERR-INVALID-TOKEN)
+        ERR-INVALID-TOKEN
+    )
+)
+
+;; Validates that the amount is within acceptable bounds
+(define-private (validate-amount (amount uint))
+    (if (and 
+        (>= amount MIN-DEPOSIT-AMOUNT)
+        (<= amount MAX-DEPOSIT-AMOUNT))
+        (ok true)
+        ERR-INVALID-AMOUNT
+    )
+)
+
+;; Retrieves a node from the Merkle tree
+(define-private (get-tree-node (level uint) (index uint))
+    (default-to 
+        ZERO-VALUE
+        (get hash (map-get? merkle-tree {level: level, index: index})))
+)
