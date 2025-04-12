@@ -221,3 +221,39 @@
         (ok leaf-index)
     )
 )
+
+;; Withdraws tokens from the privacy pool by providing a valid zero-knowledge proof
+(define-public (withdraw
+    (nullifier (buff 32))
+    (root (buff 32))
+    (proof (list 20 (buff 32)))
+    (recipient principal)
+    (token <ft-trait>)
+    (amount uint))
+    (begin
+        ;; Input validation
+        (asserts! (is-valid-hash? nullifier) ERR-INVALID-PROOF)
+        (asserts! (is-valid-hash? root) ERR-INVALID-ROOT)
+        (try! (validate-amount amount))
+        (try! (validate-token token))
+        
+        ;; Check nullifier hasn't been used
+        (asserts! (is-none (map-get? nullifiers {nullifier: nullifier})) 
+            ERR-NULLIFIER-ALREADY-EXISTS)
+        
+        ;; Verify the Merkle proof
+        (try! (verify-merkle-proof nullifier proof root))
+        
+        ;; Mark nullifier as used
+        (map-set nullifiers {nullifier: nullifier} {used: true})
+        
+        ;; Transfer tokens to recipient
+        (try! (as-contract (contract-call? token transfer 
+            amount 
+            tx-sender 
+            recipient 
+            none)))
+        
+        (ok true)
+    )
+)
