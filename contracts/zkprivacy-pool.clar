@@ -91,6 +91,14 @@
     )
 )
 
+(define-private (validate-proof (proof (list 20 (buff 32))))
+    (let ((proof-length (len proof)))
+        (asserts! (is-eq proof-length u20) ERR-INVALID-PROOF)
+        (asserts! (fold and (map is-valid-hash? proof) true) ERR-INVALID-PROOF)
+        (ok true)
+    )
+)
+
 ;; Validates that the amount is within acceptable bounds
 (define-private (validate-amount (amount uint))
     (if (and 
@@ -212,7 +220,7 @@
             {commitment: commitment}
             {
                 leaf-index: leaf-index,
-                timestamp: block-height
+                timestamp: stacks-block-height
             })
         
         (var-set next-index (+ leaf-index u1))
@@ -234,6 +242,7 @@
         ;; Input validation
         (asserts! (is-valid-hash? nullifier) ERR-INVALID-PROOF)
         (asserts! (is-valid-hash? root) ERR-INVALID-ROOT)
+		(asserts! (not (is-eq recipient tx-sender)) ERR-INVALID-RECIPIENT)
         (try! (validate-amount amount))
         (try! (validate-token token))
         
