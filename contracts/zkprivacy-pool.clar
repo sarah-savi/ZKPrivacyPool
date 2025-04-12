@@ -257,3 +257,47 @@
         (ok true)
     )
 )
+
+;; Admin Functions
+
+;; Sets the allowed token for the privacy pool
+(define-public (set-allowed-token (token-principal (optional principal)))
+    (begin
+        (asserts! (is-eq tx-sender (var-get contract-owner)) ERR-NOT-AUTHORIZED)
+        (var-set allowed-token token-principal)
+        (ok true)
+    )
+)
+
+;; Transfers ownership of the contract to a new principal
+(define-public (transfer-ownership (new-owner principal))
+    (begin
+        (asserts! (is-eq tx-sender (var-get contract-owner)) ERR-NOT-AUTHORIZED)
+        (asserts! (not (is-eq new-owner (var-get contract-owner))) ERR-NOT-AUTHORIZED)
+        (var-set contract-owner new-owner)
+        (ok true)
+    )
+)
+
+;; Read-only Functions
+
+;; Gets the current Merkle root
+(define-read-only (get-current-root)
+    (ok (var-get current-root))
+)
+
+;; Checks if a nullifier has been used
+(define-read-only (is-nullifier-used (nullifier (buff 32)))
+    (is-some (map-get? nullifiers {nullifier: nullifier}))
+)
+
+;; Gets information about a deposit by commitment
+(define-read-only (get-deposit-info (commitment (buff 32)))
+    (map-get? deposits {commitment: commitment})
+)
+
+;; Initialization
+(begin
+    (var-set current-root ZERO-VALUE)
+    (var-set next-index u0)
+)
